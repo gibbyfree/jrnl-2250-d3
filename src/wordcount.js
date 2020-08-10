@@ -1,6 +1,8 @@
-let margin = {top: 10, right: 30, bottom: 30, left: 60},
-    width = 460 - margin.left - margin.right,
-    height = 400 - margin.top - margin.bottom
+// Code for mouseover interactivity largely pulled from: https://www.d3-graph-gallery.com/graph/line_cursor.html
+
+let margin = {top: 30, right: 250, bottom: 30, left: 60},
+    width = 900 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom
 
 let wcSvg = d3.select("#wordcount")
               .append('svg')
@@ -45,6 +47,7 @@ const wordcountData = [
     {"date": "09/10/2014", "wordcount": 2415},
     {"date": "09/11/2014", "wordcount": 876}]
 
+// Create x-axis from date.
 let x = d3.scaleTime()
           .domain(d3.extent(wordcountData, function(d) { return new Date(d.date)}))
           .range([0, width])
@@ -54,11 +57,28 @@ let x = d3.scaleTime()
                .tickFormat(d3.timeFormat("%m/%d"))
                .ticks(4))
 
+// Create y-axis from wordcount.
 let y = d3.scaleLinear()
           .domain([0, d3.max(wordcountData, function(d) {return +d.wordcount})])
           .range([height, 0])
           wcSvg.append('g')
                .call(d3.axisLeft(y))
+
+let bisect = d3.bisector(function(d) { return new Date(d.date)}).left
+
+// Circle + text for mouseover interactivity
+let focus = wcSvg.append('g')
+                 .append('circle')
+                 .style('fill', 'none')
+                 .attr('stroke', 'black')
+                 .attr('r', 8.5)
+                 .style('opacity', 0)
+
+let focusText = wcSvg.append('g')
+                     .append('text')
+                     .style('opacity', 0)
+                     .attr('text-anchor', 'left')
+                     .attr('allignment-baseline', 'middle')
    
  wcSvg.append('path')
       .datum(wordcountData)
@@ -68,3 +88,34 @@ let y = d3.scaleLinear()
       .attr('d', d3.line()
                    .x(function(d) { return x(new Date(d.date)) })
                    .y(function(d) { return y(d.wordcount) }))
+
+// Pointer event monitoring rect that sits on top of the rest of the viz
+let mouseoverRect = wcSvg.append('rect')
+                         .style('fill', 'none')
+                         .style('pointer-events', 'all')
+                         .attr('width', width)
+                         .attr('height', height)
+                         .on('mouseover', mouseover)
+                         .on('mousemove', mousemove)
+                         .on('mouseout', mouseout)
+
+function mouseover() {
+    focus.style("opacity", 1)
+    focusText.style("opacity", 1)
+}
+
+function mousemove() {
+    let x0 = x.invert(d3.mouse(this)[0])
+    let i = bisect(wordcountData, x0, 1)
+    selectedData = wordcountData[i]
+    focus.attr("cx", x(new Date(selectedData.date)))
+         .attr("cy", y(selectedData.wordcount))
+    focusText.html("Date: " + selectedData.date + " - Wordcount: " + selectedData.wordcount)
+             .attr("x", x(new Date(selectedData.date)))
+             .attr("y", y(selectedData.wordcount))
+}
+
+function mouseout() {
+    focus.style("opacity", 0)
+    focusText.style("opacity", 0)
+}
